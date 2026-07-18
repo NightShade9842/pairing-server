@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SABAODY Pairing</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 420px; margin: 60px auto; text-align: center; padding: 20px; }
+    input, button { padding: 12px; margin: 8px 0; width: 100%; font-size: 16px; box-sizing: border-box; }
+    #result { margin-top: 20px; font-size: 18px; }
+    .code { font-weight: bold; font-size: 22px; color: #f4a261; }
+  </style>
+</head>
+<body>
+  <h2>🔗 SABAODY Bot Pairing</h2>
+  <p>Enter the WhatsApp number you want to pair (with country code):</p>
+  <input type="tel" id="phone" placeholder="e.g. 233540876191">
+  <button onclick="getCode()">Get Pairing Code</button>
+  <div id="result"></div>
+
+  <script>
+    async function getCode() {
+      const phone = document.getElementById('phone').value.replace(/[^0-9]/g, '');
+      if (!phone) return alert('Enter a valid phone number.');
+      const res = await fetch(`/api/pair?phone=${phone}`);
+      const data = await res.json();
+      if (data.success) {
+        document.getElementById('result').innerHTML = `✅ Your pairing code:<br><span class="code">${data.code}</span><br><br>Open WhatsApp → Linked Devices → Link a Device → enter this code.`;
+      } else {
+        document.getElementById('result').innerHTML = `❌ Error: ${data.error}`;
+      }
+    }
+  </script>
+</body>
+</html>
