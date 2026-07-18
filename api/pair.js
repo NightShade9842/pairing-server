@@ -1,18 +1,15 @@
 const { makeWASocket, fetchLatestBaileysVersion, useMultiFileAuthState } = require('@whiskeysockets/baileys');
 
 module.exports = async (req, res) => {
-  // Enable CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET');
 
   const phone = (req.query.phone || '').replace(/[^0-9]/g, '');
   if (!phone) {
-    return res.status(400).json({ error: 'Missing phone number' });
+    return res.status(400).json({ error: 'Missing phone number. Usage: /api/pair?phone=233...' });
   }
 
   try {
-    // Create a temporary auth state (in memory)
-    const { state, saveCreds } = await useMultiFileAuthState('/tmp/auth_info');
+    const { state } = await useMultiFileAuthState('/tmp/auth_info');
     const { version } = await fetchLatestBaileysVersion();
 
     const sock = makeWASocket({
@@ -21,17 +18,13 @@ module.exports = async (req, res) => {
       printQRInTerminal: false,
     });
 
-    // Request pairing code
     const code = await sock.requestPairingCode(phone);
-    console.log(`Generated code for ${phone}: ${code}`);
+    // Disconnect after getting the code
+    sock.logout().catch(() => {});
+    setTimeout(() => sock.ws?.close?.(), 1000);
 
-    // Disconnect gracefully
-    await sock.logout();
-    await new Promise(resolve => setTimeout(resolve, 1000)); // let socket close
-
-    return res.status(200).json({ code: code, phone: phone });
+    return res.status(200).json({ success: true, phone, code });
   } catch (err) {
-    console.error('Error:', err.message);
-    return res.status(500).json({ error: 'Failed to generate pairing code. Make sure the number is valid and not already registered.' });
+    return res.status(500).json({ success: false, error: err.message || 'Could not generate code.' });
   }
 };
