@@ -1,4 +1,3 @@
-// server.js
 const express = require('express');
 const cors = require('cors');
 const { makeWASocket, fetchLatestBaileysVersion, useMultiFileAuthState } = require('@whiskeysockets/baileys');
@@ -6,7 +5,7 @@ const { makeWASocket, fetchLatestBaileysVersion, useMultiFileAuthState } = requi
 const app = express();
 app.use(cors());
 
-// Store active temporary sockets with their cleanup timers
+// Store active sockets so they stay alive while the code is being used
 const activeSockets = new Map();
 
 app.get('/api/pair', async (req, res) => {
@@ -16,6 +15,7 @@ app.get('/api/pair', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Missing phone number' });
     }
 
+    // Baileys v6 still uses the same API
     const authFolder = '/tmp/auth_info_' + Date.now();
     const { state, saveCreds } = await useMultiFileAuthState(authFolder);
     const { version } = await fetchLatestBaileysVersion();
@@ -27,25 +27,26 @@ app.get('/api/pair', async (req, res) => {
       browser: ['SABAODY Pairing', 'Chrome', '1.0.0'],
     });
 
-    // Wait until the socket is ready
+    // v6 often needs a bit more time to stabilise
     await new Promise((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error('Timeout waiting for connection')), 30000);
+      const timer = setTimeout(() => reject(new Error('Timeout waiting for connection')), 25000);
       sock.ev.on('connection.update', (update) => {
         const { connection } = update;
         if (connection === 'connecting' || connection === 'open') {
           clearTimeout(timer);
-          resolve();
+          // let the socket breathe
+          setTimeout(resolve, 2000);
         }
       });
     });
 
     const code = await sock.requestPairingCode(phone);
 
-    // Keep the socket alive for 60 seconds so WhatsApp accepts the code
+    // Keep the socket alive for 60 seconds
     const socketId = Date.now().toString();
     activeSockets.set(socketId, sock);
 
-    // Schedule cleanup
+    // Cleanup after 60s
     setTimeout(() => {
       try {
         sock.ws?.close();
@@ -53,24 +54,16 @@ app.get('/api/pair', async (req, res) => {
       } catch (e) {}
     }, 60000);
 
-    // Also listen for the socket closing on its own
-    sock.ev.on('connection.update', (update) => {
-      if (update.connection === 'close') {
-        clearTimeout(/* we don't have a direct ref, but we can ignore */);
-        activeSockets.delete(socketId);
-      }
-    });
-
-    // Send the response immediately
     return res.json({ success: true, phone, code });
   } catch (err) {
+    console.error('Pairing error:', err);
     return res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// Cleanup endpoint (optional) – call /api/cleanup to close all idle sockets
+// Optional cleanup endpoint
 app.get('/api/cleanup', (req, res) => {
-  activeSockets.forEach((sock, id) => {
+  activeSockets.forEach((sock) => {
     try { sock.ws?.close(); } catch (e) {}
   });
   activeSockets.clear();
