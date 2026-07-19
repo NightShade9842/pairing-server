@@ -1,74 +1,95 @@
 const express = require('express');
 const cors = require('cors');
-const { makeWASocket, fetchLatestBaileysVersion, useMultiFileAuthState } = require('@whiskeysockets/baileys');
+const fs = require('fs');
+const pino = require('pino');
+const {
+  makeWASocket,
+  useMultiFileAuthState,
+  makeCacheableSignalKeyStore,
+  Browsers,
+  fetchLatestBaileysVersion,
+} = require('@whiskeysockets/baileys');
+const pn = require('awesome-phonenumber');
 
 const app = express();
 app.use(cors());
 
-// Store active sockets so they stay alive while the code is being used
-const activeSockets = new Map();
+function removeDir(dir) {
+  try {
+    if (fs.existsSync(dir)) fs.rmSync(dir, { recursive: true, force: true });
+  } catch (e) {}
+}
 
 app.get('/api/pair', async (req, res) => {
-  try {
-    const phone = (req.query.phone || '').replace(/[^0-9]/g, '');
-    if (!phone) {
-      return res.status(400).json({ success: false, error: 'Missing phone number' });
-    }
+  let num = req.query.phone;
+  if (!num) return res.status(400).json({ success: false, error: 'Missing phone number' });
 
-    // Baileys v6 still uses the same API
-    const authFolder = '/tmp/auth_info_' + Date.now();
-    const { state, saveCreds } = await useMultiFileAuthState(authFolder);
+  num = num.replace(/[^0-9]/g, '');
+  const phoneObj = pn('+' + num);
+  if (!phoneObj.isValid()) return res.status(400).json({ success: false, error: 'Invalid phone number' });
+  num = phoneObj.getNumber('e164').replace('+', '');
+
+  const sessionDir = './session_' + Date.now();
+
+  try {
+    const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
     const { version } = await fetchLatestBaileysVersion();
 
     const sock = makeWASocket({
-      auth: state,
       version,
+      auth: {
+        creds: state.creds,
+        keys: makeCacheableSignalKeyStore(state.keys, pino({ level: 'fatal' }).child({ level: 'fatal' })),
+      },
       printQRInTerminal: false,
-      browser: ['SABAODY Pairing', 'Chrome', '1.0.0'],
+      logger: pino({ level: 'fatal' }).child({ level: 'fatal' }),
+      browser: Browsers.windows('Chrome'),
+      markOnlineOnConnect: false,
+      generateHighQualityLinkPreview: false,
+      defaultQueryTimeoutMs: 60000,
+      connectTimeoutMs: 60000,
+      keepAliveIntervalMs: 30000,
+      retryRequestDelayMs: 250,
+      maxRetries: 5,
     });
 
-    // v6 often needs a bit more time to stabilise
+    // Wait for fully open connection
     await new Promise((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error('Timeout waiting for connection')), 25000);
+      const timer = setTimeout(() => reject(new Error('Connection timed out')), 45000);
       sock.ev.on('connection.update', (update) => {
-        const { connection } = update;
-        if (connection === 'connecting' || connection === 'open') {
+        if (update.connection === 'open') {
           clearTimeout(timer);
-          // let the socket breathe
-          setTimeout(resolve, 2000);
+          resolve();
         }
       });
     });
 
-    const code = await sock.requestPairingCode(phone);
+    const code = await sock.requestPairingCode(num);
+    const formattedCode = code?.match(/.{1,4}/g)?.join('-') || code;
 
-    // Keep the socket alive for 60 seconds
-    const socketId = Date.now().toString();
-    activeSockets.set(socketId, sock);
+    // Send response immediately
+    res.json({ success: true, phone: num, code: formattedCode });
 
-    // Cleanup after 60s
+    // Keep socket alive for 60 seconds so the code is valid
     setTimeout(() => {
-      try {
-        sock.ws?.close();
-        activeSockets.delete(socketId);
-      } catch (e) {}
+      try { sock.ws?.close(); removeDir(sessionDir); } catch (e) {}
     }, 60000);
 
-    return res.json({ success: true, phone, code });
+    sock.ev.on('connection.update', (update) => {
+      if (update.connection === 'close') {
+        try { sock.ws?.close(); removeDir(sessionDir); } catch (e) {}
+      }
+    });
+
+    sock.ev.on('creds.update', saveCreds);
   } catch (err) {
     console.error('Pairing error:', err);
-    return res.status(500).json({ success: false, error: err.message });
+    if (!res.headersSent) res.status(500).json({ success: false, error: err.message || 'Internal error' });
+    removeDir(sessionDir);
   }
 });
 
-// Optional cleanup endpoint
-app.get('/api/cleanup', (req, res) => {
-  activeSockets.forEach((sock) => {
-    try { sock.ws?.close(); } catch (e) {}
-  });
-  activeSockets.clear();
-  res.json({ cleaned: true });
-});
+app.get('/', (req, res) => res.send('SABAODY Pairing API'));
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log('Pairing API running on port ' + PORT));
