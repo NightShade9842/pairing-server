@@ -14,6 +14,7 @@ const pn = require('awesome-phonenumber');
 const app = express();
 app.use(cors());
 
+// Helper to clean up session directories after use
 function removeDir(dir) {
   try {
     if (fs.existsSync(dir)) fs.rmSync(dir, { recursive: true, force: true });
@@ -53,7 +54,7 @@ app.get('/api/pair', async (req, res) => {
       maxRetries: 5,
     });
 
-    // Wait for fully open connection
+    // Wait until the socket is fully open before generating the code
     await new Promise((resolve, reject) => {
       const timer = setTimeout(() => reject(new Error('Connection timed out')), 45000);
       sock.ev.on('connection.update', (update) => {
@@ -67,14 +68,15 @@ app.get('/api/pair', async (req, res) => {
     const code = await sock.requestPairingCode(num);
     const formattedCode = code?.match(/.{1,4}/g)?.join('-') || code;
 
-    // Send response immediately
+    // Send the pairing code immediately
     res.json({ success: true, phone: num, code: formattedCode });
 
-    // Keep socket alive for 60 seconds so the code is valid
+    // Keep the socket alive for 60 seconds so the code remains valid
     setTimeout(() => {
       try { sock.ws?.close(); removeDir(sessionDir); } catch (e) {}
     }, 60000);
 
+    // Clean up if the socket disconnects earlier
     sock.ev.on('connection.update', (update) => {
       if (update.connection === 'close') {
         try { sock.ws?.close(); removeDir(sessionDir); } catch (e) {}
