@@ -2,7 +2,6 @@
 const { makeWASocket, fetchLatestBaileysVersion, useMultiFileAuthState } = require('@whiskeysockets/baileys');
 
 module.exports = async (req, res) => {
-  // Allow requests from any origin
   res.setHeader('Access-Control-Allow-Origin', '*');
 
   try {
@@ -11,7 +10,7 @@ module.exports = async (req, res) => {
       return res.status(400).json({ success: false, error: 'Missing phone number. Usage: /api/pair?phone=233...' });
     }
 
-    // Use a unique temporary folder so multiple requests don't clash
+    // Use a unique temporary auth folder for each request
     const authFolder = '/tmp/auth_info_' + Date.now();
     const { state } = await useMultiFileAuthState(authFolder);
     const { version } = await fetchLatestBaileysVersion();
@@ -23,22 +22,11 @@ module.exports = async (req, res) => {
       browser: ['SABAODY Pairing', 'Chrome', '1.0.0'],
     });
 
-    // Wait for the socket to open (or timeout after 15 seconds)
-    await new Promise((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error('Connection timed out')), 15000);
-      sock.ev.on('connection.update', (update) => {
-        if (update.connection === 'open') {
-          clearTimeout(timer);
-          resolve();
-        }
-      });
-    });
-
+    // Request pairing code immediately (no need to wait for 'open')
     const code = await sock.requestPairingCode(phone);
 
-    // Cleanly disconnect
-    try { sock.logout(); } catch (e) {}
-    setTimeout(() => sock.ws?.close(), 500);
+    // Cleanly close the socket
+    sock.ws?.close();
 
     return res.status(200).json({ success: true, phone, code });
   } catch (err) {
