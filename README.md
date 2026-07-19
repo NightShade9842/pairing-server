@@ -1,1 +1,0 @@
-# pairing-server
