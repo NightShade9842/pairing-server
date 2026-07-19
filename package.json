@@ -1,7 +1,12 @@
 {
   "name": "sabaody-pairing-server",
   "version": "1.0.0",
+  "description": "Generate WhatsApp pairing codes for SABAODY Bot",
+  "private": true,
   "dependencies": {
     "@whiskeysockets/baileys": "^7.0.0-rc13"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }
