@@ -1,6 +1,7 @@
 {
   "name": "sabaody-pairing-api",
   "version": "1.0.0",
+  "description": "SABAODY Bot pairing code generator",
   "scripts": {
     "start": "node server.js"
   },
