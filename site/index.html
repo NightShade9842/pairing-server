@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SABAODY Bot Pairing</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: #0a0a1a;
+      color: #fff;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 20px;
+    }
+    .container {
+      background: #1a1a2e;
+      border: 2px solid #f4a261;
+      border-radius: 16px;
+      padding: 30px 25px;
+      max-width: 420px;
+      width: 100%;
+      text-align: center;
+      box-shadow: 0 0 20px rgba(244,162,97,0.3);
+    }
+    h2 {
+      font-size: 28px;
+      margin-bottom: 10px;
+      color: #f4a261;
+    }
+    p {
+      font-size: 15px;
+      margin-bottom: 20px;
+      color: #ccc;
+    }
+    input {
+      width: 100%;
+      padding: 14px 16px;
+      font-size: 16px;
+      border-radius: 10px;
+      border: 2px solid #333;
+      background: #0a0a1a;
+      color: #fff;
+      outline: none;
+      margin-bottom: 12px;
+    }
+    input:focus { border-color: #f4a261; }
+    button {
+      width: 100%;
+      padding: 14px;
+      font-size: 17px;
+      font-weight: bold;
+      background: #f4a261;
+      color: #0a0a1a;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: 0.2s ease;
+    }
+    button:disabled { opacity: 0.6; cursor: not-allowed; }
+    button:hover:not(:disabled) { background: #e07b2c; }
+    #result {
+      margin-top: 20px;
+      font-size: 18px;
+      line-height: 1.6;
+      word-break: break-all;
+    }
+    .code {
+      display: inline-block;
+      margin-top: 8px;
+      font-size: 28px;
+      font-weight: bold;
+      color: #f4a261;
+      letter-spacing: 2px;
+      background: #0a0a1a;
+      padding: 6px 18px;
+      border-radius: 8px;
+      border: 1px solid #f4a261;
+    }
+    .error {
+      color: #e74c3c;
+      font-weight: bold;
+    }
+    .note {
+      font-size: 13px;
+      margin-top: 25px;
+      color: #888;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>⚓ SABAODY Pairing</h2>
+    <p>Enter the WhatsApp number you want to pair (with country code)</p>
+    <input type="tel" id="phone" placeholder="e.g. 233560806367">
+    <button id="btn" onclick="getCode()">Get Pairing Code</button>
+    <div id="result"></div>
+    <div class="note">
+      Open WhatsApp → Linked Devices → Link a Device<br>and enter the code shown above.
+    </div>
+  </div>
+
+  <script>
+    const btn = document.getElementById('btn');
+    const resultDiv = document.getElementById('result');
+
+    async function getCode() {
+      const phone = document.getElementById('phone').value.replace(/[^0-9]/g, '');
+      if (!phone) {
+        resultDiv.innerHTML = '<span class="error">Please enter a valid phone number.</span>';
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = 'Generating...';
+      resultDiv.innerHTML = '';
+
+      try {
+        const res = await fetch(`https://sabaody-pairing-api.onrender.com/api/pair?phone=${phone}`);
+        const data = await res.json();
+
+        if (data.success) {
+          resultDiv.innerHTML = `✅ Your pairing code:<br><span class="code">${data.code}</span><br><br>⚠️ Use this code within 60 seconds.`;
+        } else {
+          resultDiv.innerHTML = `<span class="error">❌ ${data.error}</span>`;
+        }
+      } catch (err) {
+        resultDiv.innerHTML = '<span class="error">❌ Could not reach the server. Try again later.</span>';
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Get Pairing Code';
+      }
+    }
+  </script>
+</body>
+</html>
