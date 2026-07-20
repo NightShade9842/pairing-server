@@ -46,8 +46,8 @@ app.get('/api/pair', async (req, res) => {
       browser: Browsers.windows('Chrome'),
       markOnlineOnConnect: false,
       generateHighQualityLinkPreview: false,
-      defaultQueryTimeoutMs: 60000,
-      connectTimeoutMs: 60000,
+      defaultQueryTimeoutMs: 90000,
+      connectTimeoutMs: 90000,
       keepAliveIntervalMs: 30000,
       retryRequestDelayMs: 250,
       maxRetries: 5,
@@ -71,15 +71,15 @@ app.get('/api/pair', async (req, res) => {
     // Send the pairing code immediately
     res.json({ success: true, phone: num, code: formattedCode });
 
-    // Keep the socket alive for 60 seconds so the code remains valid
+    // Keep the socket alive for 3 minutes so WhatsApp accepts the code
     setTimeout(() => {
       try { sock.ws?.close(); removeDir(sessionDir); } catch (e) {}
-    }, 60000);
+    }, 180000);
 
-    // Clean up if the socket disconnects earlier
+    // Do not force-close on disconnect — let WhatsApp handle the lifecycle
     sock.ev.on('connection.update', (update) => {
       if (update.connection === 'close') {
-        try { sock.ws?.close(); removeDir(sessionDir); } catch (e) {}
+        setTimeout(() => removeDir(sessionDir), 5000);
       }
     });
 
