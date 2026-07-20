@@ -14,7 +14,6 @@ const pn = require('awesome-phonenumber');
 const app = express();
 app.use(cors());
 
-// Helper to clean up session directories after use
 function removeDir(dir) {
   try {
     if (fs.existsSync(dir)) fs.rmSync(dir, { recursive: true, force: true });
@@ -54,13 +53,14 @@ app.get('/api/pair', async (req, res) => {
       maxRetries: 5,
     });
 
-    // Wait until the socket is fully open before generating the code
+    // Wait for the socket to be ready (connecting or open)
     await new Promise((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error('Connection timed out')), 45000);
+      const timer = setTimeout(() => reject(new Error('Connection timed out')), 70000);
       sock.ev.on('connection.update', (update) => {
-        if (update.connection === 'open') {
+        const { connection } = update;
+        if (connection === 'connecting' || connection === 'open') {
           clearTimeout(timer);
-          resolve();
+          setTimeout(resolve, 4000);
         }
       });
     });
@@ -91,7 +91,7 @@ app.get('/api/pair', async (req, res) => {
   }
 });
 
-app.get('/', (req, res) => res.send('SABAODY Pairing API'));
+app.get('/', (req, res) => res.send('SABAODY Pairing API is running'));
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log('Pairing API running on port ' + PORT));
