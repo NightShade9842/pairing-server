@@ -116,11 +116,11 @@
 
       btn.disabled = true;
       btn.textContent = 'Connecting to WhatsApp...';
-      resultDiv.innerHTML = '⏳ Please wait — this may take up to 45 seconds.';
+      resultDiv.innerHTML = '⏳ Please wait — this may take up to 90 seconds on first use.';
 
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 50000); // 50-second timeout
+        const timeoutId = setTimeout(() => controller.abort(), 95000);
 
         const res = await fetch(`https://sabaody-pairing-api.onrender.com/api/pair?phone=${phone}`, {
           signal: controller.signal
@@ -136,7 +136,7 @@
         }
       } catch (err) {
         if (err.name === 'AbortError') {
-          resultDiv.innerHTML = '<span class="error">❌ Request timed out. The service may be waking up — try again in 5 seconds.</span>';
+          resultDiv.innerHTML = '<span class="error">❌ Request timed out. Try again in a few seconds — the service is waking up.</span>';
         } else {
           resultDiv.innerHTML = '<span class="error">❌ Could not reach the server. Try again later.</span>';
         }
