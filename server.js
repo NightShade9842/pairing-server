@@ -53,12 +53,12 @@ app.get('/api/pair', async (req, res) => {
       maxRetries: 5,
     });
 
-    // Wait for the socket to be ready (connecting or open)
+    // Wait for the socket to be fully open before generating the code
     await new Promise((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error('Connection timed out')), 70000);
+      const timer = setTimeout(() => reject(new Error('Connection timed out')), 90000);
       sock.ev.on('connection.update', (update) => {
         const { connection } = update;
-        if (connection === 'connecting' || connection === 'open') {
+        if (connection === 'open') {
           clearTimeout(timer);
           setTimeout(resolve, 4000);
         }
