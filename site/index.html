@@ -115,11 +115,18 @@
       }
 
       btn.disabled = true;
-      btn.textContent = 'Generating...';
-      resultDiv.innerHTML = '';
+      btn.textContent = 'Connecting to WhatsApp...';
+      resultDiv.innerHTML = '⏳ Please wait — this may take up to 45 seconds.';
 
       try {
-        const res = await fetch(`https://sabaody-pairing-api.onrender.com/api/pair?phone=${phone}`);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 50000); // 50-second timeout
+
+        const res = await fetch(`https://sabaody-pairing-api.onrender.com/api/pair?phone=${phone}`, {
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+
         const data = await res.json();
 
         if (data.success) {
@@ -128,7 +135,11 @@
           resultDiv.innerHTML = `<span class="error">❌ ${data.error}</span>`;
         }
       } catch (err) {
-        resultDiv.innerHTML = '<span class="error">❌ Could not reach the server. Try again later.</span>';
+        if (err.name === 'AbortError') {
+          resultDiv.innerHTML = '<span class="error">❌ Request timed out. The service may be waking up — try again in 5 seconds.</span>';
+        } else {
+          resultDiv.innerHTML = '<span class="error">❌ Could not reach the server. Try again later.</span>';
+        }
       } finally {
         btn.disabled = false;
         btn.textContent = 'Get Pairing Code';
