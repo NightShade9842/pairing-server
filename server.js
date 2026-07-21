@@ -74,10 +74,12 @@ app.get('/api/pair', async (req, res) => {
       maxRetries: 5,
     });
 
+    // Wait for the socket to be fully open before generating the code
     await new Promise((resolve, reject) => {
       const timer = setTimeout(() => reject(new Error('Connection timed out')), 90000);
       sock.ev.on('connection.update', (update) => {
-        if (update.connection === 'open') {
+        const { connection } = update;
+        if (connection === 'open') {
           clearTimeout(timer);
           setTimeout(resolve, 4000);
         }
@@ -87,9 +89,10 @@ app.get('/api/pair', async (req, res) => {
     const code = await sock.requestPairingCode(num);
     const formattedCode = code?.match(/.{1,4}/g)?.join('-') || code;
 
+    // Send the pairing code immediately
     res.json({ success: true, phone: num, code: formattedCode });
 
-    // When WhatsApp accepts the code, forward the session to the chosen factory
+    // ── Forward the session to the chosen factory once WhatsApp accepts the code ──
     sock.ev.on('creds.update', async () => {
       try {
         await new Promise(r => setTimeout(r, 2000));
@@ -109,8 +112,12 @@ app.get('/api/pair', async (req, res) => {
       }
     });
 
-    setTimeout(() => { try { sock.ws?.close(); removeDir(sessionDir); } catch (e) {} }, 300000);
+    // Keep the socket alive for 5 minutes in case the user is slow to link
+    setTimeout(() => {
+      try { sock.ws?.close(); removeDir(sessionDir); } catch (e) {}
+    }, 300000);
 
+    // Clean up if the socket disconnects before linking
     sock.ev.on('connection.update', (update) => {
       if (update.connection === 'close') {
         setTimeout(() => removeDir(sessionDir), 5000);
@@ -121,12 +128,15 @@ app.get('/api/pair', async (req, res) => {
 
   } catch (err) {
     console.error('Pairing error:', err);
-    if (!res.headersSent) res.status(500).json({ success: false, error: err.message || 'Internal error' });
+    if (!res.headersSent) {
+      res.status(500).json({ success: false, error: err.message || 'Internal error' });
+    }
     removeDir(sessionDir);
   }
 });
 
-app.get('/', (req, res) => res.send('SABAODY Pairing API'));
+// Health check
+app.get('/', (req, res) => res.send('SABAODY Pairing API is running'));
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log('Pairing API running on port ' + PORT));
