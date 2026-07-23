@@ -21,21 +21,42 @@
       border: 2px solid #f4a261;
       border-radius: 16px;
       padding: 30px 25px;
-      max-width: 420px;
+      max-width: 450px;
       width: 100%;
       text-align: center;
       box-shadow: 0 0 20px rgba(244,162,97,0.3);
     }
-    h2 {
-      font-size: 28px;
-      margin-bottom: 10px;
-      color: #f4a261;
-    }
-    p {
-      font-size: 15px;
+    h2 { font-size: 28px; margin-bottom: 10px; color: #f4a261; }
+    p { font-size: 15px; margin-bottom: 20px; color: #ccc; }
+
+    /* Toggle */
+    .toggle-container {
+      display: flex;
+      align-items: center;
+      justify-content: center;
       margin-bottom: 20px;
+      background: #0a0a1a;
+      border-radius: 12px;
+      padding: 4px;
+      border: 1px solid #333;
+    }
+    .toggle-option {
+      flex: 1;
+      padding: 10px 16px;
+      text-align: center;
+      cursor: pointer;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      transition: all 0.3s ease;
       color: #ccc;
     }
+    .toggle-option.active {
+      background: #f4a261;
+      color: #0a0a1a;
+      font-weight: bold;
+    }
+
     input {
       width: 100%;
       padding: 14px 16px;
@@ -59,6 +80,7 @@
       border-radius: 10px;
       cursor: pointer;
       transition: 0.2s ease;
+      margin-bottom: 12px;
     }
     button:disabled { opacity: 0.6; cursor: not-allowed; }
     button:hover:not(:disabled) { background: #e07b2c; }
@@ -80,47 +102,99 @@
       border-radius: 8px;
       border: 1px solid #f4a261;
     }
-    .error {
-      color: #e74c3c;
-      font-weight: bold;
+    .qr-image {
+      max-width: 280px;
+      max-height: 280px;
+      margin: 0 auto 20px;
+      border-radius: 12px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.3);
     }
-    .note {
+    .qr-instructions {
       font-size: 13px;
-      margin-top: 25px;
-      color: #888;
+      color: #aaa;
+      line-height: 1.5;
+      margin-bottom: 20px;
     }
+    .error { color: #e74c3c; font-weight: bold; }
+    .note { font-size: 13px; margin-top: 25px; color: #888; }
+    .hidden { display: none; }
   </style>
 </head>
 <body>
   <div class="container">
     <h2>⚓ SABAODY Pairing</h2>
-    <p>Enter the WhatsApp number you want to pair (with country code)</p>
-    <input type="tel" id="phone" placeholder="e.g. 233560806367">
-    <button id="btn" onclick="getCode()">Get Pairing Code</button>
+    <p>Link your WhatsApp device</p>
+
+    <!-- Toggle -->
+    <div class="toggle-container">
+      <div class="toggle-option active" data-mode="pair">
+        <i class="fas fa-key"></i> Pair Code
+      </div>
+      <div class="toggle-option" data-mode="qr">
+        <i class="fas fa-qrcode"></i> QR Code
+      </div>
+    </div>
+
+    <!-- Pair Code Section -->
+    <div id="pairSection">
+      <input type="tel" id="phone" placeholder="e.g. 233560806367">
+      <button id="btnPair" onclick="getPairCode()">Get Pairing Code</button>
+    </div>
+
+    <!-- QR Code Section (hidden by default) -->
+    <div id="qrSection" class="hidden">
+      <button id="btnQR" onclick="getQRCode()">Generate QR Code</button>
+    </div>
+
     <div id="result"></div>
     <div class="note">
-      Open WhatsApp → Linked Devices → Link a Device<br>and enter the code shown above.
+      Open WhatsApp → Linked Devices → Link a Device<br>and enter the code or scan the QR.
     </div>
   </div>
 
   <script>
-    const btn = document.getElementById('btn');
+    const pairSection = document.getElementById('pairSection');
+    const qrSection = document.getElementById('qrSection');
+    const btnPair = document.getElementById('btnPair');
+    const btnQR = document.getElementById('btnQR');
     const resultDiv = document.getElementById('result');
 
-    async function getCode() {
+    // Toggle logic
+    document.querySelectorAll('.toggle-option').forEach(opt => {
+      opt.addEventListener('click', function() {
+        const mode = this.dataset.mode;
+        document.querySelectorAll('.toggle-option').forEach(o => o.classList.remove('active'));
+        this.classList.add('active');
+
+        if (mode === 'pair') {
+          pairSection.classList.remove('hidden');
+          qrSection.classList.add('hidden');
+          resultDiv.innerHTML = '';
+        } else {
+          pairSection.classList.add('hidden');
+          qrSection.classList.remove('hidden');
+          resultDiv.innerHTML = '';
+          // Auto-generate QR when switching
+          getQRCode();
+        }
+      });
+    });
+
+    // ── Pair Code ────────────────────────
+    async function getPairCode() {
       const phone = document.getElementById('phone').value.replace(/[^0-9]/g, '');
       if (!phone) {
         resultDiv.innerHTML = '<span class="error">Please enter a valid phone number.</span>';
         return;
       }
 
-      btn.disabled = true;
-      btn.textContent = 'Connecting to WhatsApp...';
-      resultDiv.innerHTML = '⏳ Please wait — this may take up to 90 seconds on first use.';
+      btnPair.disabled = true;
+      btnPair.textContent = 'Connecting to WhatsApp...';
+      resultDiv.innerHTML = '⏳ Please wait — this may take up to 2 minutes on first use.';
 
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 95000);
+        const timeoutId = setTimeout(() => controller.abort(), 130000);
 
         const res = await fetch(`https://sabaody-pairing-api.onrender.com/api/pair?phone=${phone}`, {
           signal: controller.signal
@@ -128,7 +202,6 @@
         clearTimeout(timeoutId);
 
         const data = await res.json();
-
         if (data.success) {
           resultDiv.innerHTML = `✅ Your pairing code:<br><span class="code">${data.code}</span><br><br>⚠️ Use this code within 60 seconds.`;
         } else {
@@ -136,13 +209,49 @@
         }
       } catch (err) {
         if (err.name === 'AbortError') {
-          resultDiv.innerHTML = '<span class="error">❌ Request timed out. Try again in a few seconds — the service is waking up.</span>';
+          resultDiv.innerHTML = '<span class="error">❌ Request timed out. Try again in a few seconds.</span>';
         } else {
           resultDiv.innerHTML = '<span class="error">❌ Could not reach the server. Try again later.</span>';
         }
       } finally {
-        btn.disabled = false;
-        btn.textContent = 'Get Pairing Code';
+        btnPair.disabled = false;
+        btnPair.textContent = 'Get Pairing Code';
+      }
+    }
+
+    // ── QR Code ───────────────────────────
+    async function getQRCode() {
+      btnQR.disabled = true;
+      btnQR.textContent = 'Generating QR...';
+      resultDiv.innerHTML = '⏳ Please wait...';
+
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 100000);
+
+        const res = await fetch(`https://sabaody-pairing-api.onrender.com/api/qr`, {
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+
+        const data = await res.json();
+        if (data.success) {
+          resultDiv.innerHTML = `
+            <img src="${data.qr}" class="qr-image" alt="QR Code">
+            <div class="qr-instructions">${data.instructions.join('<br>')}</div>
+          `;
+        } else {
+          resultDiv.innerHTML = `<span class="error">❌ ${data.error}</span>`;
+        }
+      } catch (err) {
+        if (err.name === 'AbortError') {
+          resultDiv.innerHTML = '<span class="error">❌ QR generation timed out. Try again.</span>';
+        } else {
+          resultDiv.innerHTML = '<span class="error">❌ Could not reach the server. Try again later.</span>';
+        }
+      } finally {
+        btnQR.disabled = false;
+        btnQR.textContent = 'Generate QR Code';
       }
     }
   </script>
