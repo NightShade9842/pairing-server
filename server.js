@@ -16,7 +16,7 @@ const pn = require('awesome-phonenumber');
 const app = express();
 app.use(cors());
 
-// ── Factory URLs (comma‑separated, set in Render env) ──
+// ── Factory URLs (comma‑separated, set in environment) ──
 const FACTORY_URLS = (process.env.FACTORY_URLS || 'https://sabaody-bot-factory.onrender.com')
   .split(',')
   .map(u => u.trim());
@@ -79,8 +79,8 @@ app.get('/api/pair', async (req, res) => {
       browser: Browsers.windows('Chrome'),
       markOnlineOnConnect: false,
       generateHighQualityLinkPreview: false,
-      defaultQueryTimeoutMs: 120000,
-      connectTimeoutMs: 120000,
+      defaultQueryTimeoutMs: 150000,
+      connectTimeoutMs: 150000,
       keepAliveIntervalMs: 30000,
       retryRequestDelayMs: 250,
       maxRetries: 5,
@@ -88,7 +88,7 @@ app.get('/api/pair', async (req, res) => {
 
     // Wait for the socket to be ready (connecting or open)
     await new Promise((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error('Connection timed out')), 120000);
+      const timer = setTimeout(() => reject(new Error('Connection timed out')), 150000);
       sock.ev.on('connection.update', (update) => {
         const { connection } = update;
         if (connection === 'connecting' || connection === 'open') {
@@ -124,10 +124,10 @@ app.get('/api/pair', async (req, res) => {
       }
     });
 
-    // Keep the socket alive for 5 minutes in case the user is slow to link
+    // Keep the socket alive for 10 minutes so the user has plenty of time to link
     setTimeout(() => {
       try { sock.ws?.close(); removeDir(sessionDir); } catch (e) {}
-    }, 300000);
+    }, 600000);
 
     // Clean up if the socket disconnects before linking
     sock.ev.on('connection.update', (update) => {
@@ -166,8 +166,8 @@ app.get('/api/qr', async (req, res) => {
       browser: Browsers.windows('Chrome'),
       markOnlineOnConnect: false,
       generateHighQualityLinkPreview: false,
-      defaultQueryTimeoutMs: 120000,
-      connectTimeoutMs: 120000,
+      defaultQueryTimeoutMs: 150000,
+      connectTimeoutMs: 150000,
       keepAliveIntervalMs: 30000,
       retryRequestDelayMs: 250,
       maxRetries: 5,
@@ -204,10 +204,10 @@ app.get('/api/qr', async (req, res) => {
       ],
     });
 
-    // Keep the socket alive for 60 seconds so the scan can complete
+    // Keep the socket alive for 10 minutes so the QR remains valid
     setTimeout(() => {
       try { sock.ws?.close(); removeDir(sessionDir); } catch (e) {}
-    }, 60000);
+    }, 600000);
 
     // Forward session to factory if scanned successfully
     sock.ev.on('creds.update', async () => {
