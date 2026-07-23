@@ -1,7 +1,6 @@
 {
   "name": "sabaody-pairing-api",
   "version": "1.0.0",
-  "description": "SABAODY Bot pairing code generator",
   "scripts": {
     "start": "node server.js"
   },
@@ -11,6 +10,7 @@
     "pino": "9.5.0",
     "express": "^4.21.2",
     "cors": "^2.8.5",
-    "axios": "^1.14.0"
+    "axios": "^1.14.0",
+    "qrcode": "^1.5.4"
   }
 }
